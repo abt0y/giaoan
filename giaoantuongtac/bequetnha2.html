@@ -494,7 +494,7 @@
 
                 // Stave 1 - First part of "Bé quét nhà"
                 const stave1 = new Stave(10, 20, SVG_W - 20);
-                stave1.addClef("treble").addTimeSignature("4/4").addKeySignature("F");
+                stave1.addClef("treble").addTimeSignature("2/4").addKeySignature("F");
                 stave1.setContext(ctx).draw();
 
                 // Measures 1-8: Một sợi rơm vàng là hai sợi vàng rơm
@@ -530,60 +530,45 @@
                     n(["c/5"], "q", "làm"),
                 ];
 
-                const voice1 = new Voice({ num_beats: 16, beat_value: 4 });
+                const voice1 = new Voice({ num_beats: 8, beat_value: 4 });
                 voice1.setMode(Voice.Mode.SOFT);
-                voice1.addTickables([...bar1, ...bar2, ...bar3, ...bar4, ...bar5, ...bar6, ...bar7, ...bar8]);
+                voice1.addTickables([...bar1, ...bar2, ...bar3, ...bar4]);
                 new Formatter().joinVoices([voice1]).format([voice1], SVG_W - 160);
                 voice1.draw(ctx, stave1);
 
-                // Stave 2 - Second part
+                // Stave 2 - Second part (measures 5-8)
                 const stave2 = new Stave(10, 20 + STAVE_H, SVG_W - 20);
-                stave2.addClef("treble").addKeySignature("F");
-                try { stave2.setEndBarType(BarlineType.END); } catch (e) { stave2.setEndBarType(3); }
+                stave2.addClef("treble").addTimeSignature("2/4").addKeySignature("F");
                 stave2.setContext(ctx).draw();
 
-                // Measures 9-16: chổi nhỏ. Chổi to chổi to bà quét sân kho
-                const bar9 = [
-                    n(["a/4"], "8", "chổi"),
-                    n(["g/4"], "16", "nhỏ."),
-                    n(["f/4"], "16", ""),
-                ];
-                const bar10 = [
-                    n(["g/4"], "8", "Chổi"),
-                    n(["c/5"], "16", "to"),
-                    n(["c/5"], "16", ""),
-                ];
-                const bar11 = [
-                    n(["a/4"], "8", "chổi"),
-                    n(["a/4"], "16", "to"),
-                    n(["a/4"], "16", ""),
-                ];
-                const bar12 = [
-                    n(["a/4"], "q", "bà"),
-                ];
-                const bar13 = [
-                    n(["c/5"], "8", "quét"),
-                    n(["c/5"], "8", "sân"),
-                ];
-                const bar14 = [
-                    n(["a/4"], "8", "kho"),
-                    n(["g/4"], "8", "ấy"),
-                ];
-                const bar15 = [
-                    n(["f/4"], "8", "còn"),
-                    n(["f/4"], "8", "chổi"),
-                ];
-                const bar16 = [
-                    n(["g/4"], "16", "nhỏ"),
-                    n(["f/4"], "16", ""),
-                    n(["g/4"], "8", "bà"),
-                ];
-
-                const voice2 = new Voice({ num_beats: 16, beat_value: 4 });
+                const voice2 = new Voice({ num_beats: 8, beat_value: 4 });
                 voice2.setMode(Voice.Mode.SOFT);
-                voice2.addTickables([...bar9, ...bar10, ...bar11, ...bar12, ...bar13, ...bar14, ...bar15, ...bar16]);
+                voice2.addTickables([...bar5, ...bar6, ...bar7, ...bar8]);
                 new Formatter().joinVoices([voice2]).format([voice2], SVG_W - 160);
                 voice2.draw(ctx, stave2);
+
+                // Stave 3 - Third part (measures 9-12)
+                const stave3 = new Stave(10, 20 + STAVE_H * 2, SVG_W - 20);
+                stave3.addClef("treble").addTimeSignature("2/4").addKeySignature("F");
+                stave3.setContext(ctx).draw();
+
+                const voice3 = new Voice({ num_beats: 8, beat_value: 4 });
+                voice3.setMode(Voice.Mode.SOFT);
+                voice3.addTickables([...bar9, ...bar10, ...bar11, ...bar12]);
+                new Formatter().joinVoices([voice3]).format([voice3], SVG_W - 160);
+                voice3.draw(ctx, stave3);
+
+                // Stave 4 - Fourth part (measures 13-16)
+                const stave4 = new Stave(10, 20 + STAVE_H * 3, SVG_W - 20);
+                stave4.addClef("treble").addTimeSignature("2/4").addKeySignature("F");
+                try { stave4.setEndBarType(BarlineType.END); } catch (e) { stave4.setEndBarType(3); }
+                stave4.setContext(ctx).draw();
+
+                const voice4 = new Voice({ num_beats: 8, beat_value: 4 });
+                voice4.setMode(Voice.Mode.SOFT);
+                voice4.addTickables([...bar13, ...bar14, ...bar15, ...bar16]);
+                new Formatter().joinVoices([voice4]).format([voice4], SVG_W - 160);
+                voice4.draw(ctx, stave4);
 
                 // Recolor to sepia
                 const svg = scoreDiv.querySelector("svg");
@@ -611,62 +596,90 @@
         const BPM = 72;
         const Q = 60 / BPM;        // quarter
         const H = Q * 2;            // half
+        const W = Q * 4;            // whole
         const E = Q / 2;            // eighth
         const S = Q / 4;            // sixteenth
 
         const SEQUENCE = [
-            // Measures 1-4: Một sợi rơm vàng là hai sợi vàng rơm
-            { note: "C4", dur: Q },    // Một
-            { note: "F4", dur: E },    // sợi
-            { note: "F4", dur: E },    // rơm
-            { note: "G4", dur: E },    // vàng
-            { note: "A4", dur: E },    // là
-            { note: "A4", dur: E },    // hai
-            { note: "G4", dur: E },    // sợi
-            { note: "A4", dur: E },    // vàng
-            { note: "C5", dur: E },    // rơm.
-            // Measures 5-8: Bà bện chổi to bà làm
-            { note: "C5", dur: E },    // Bà
-            { note: "A4", dur: E },    // bện
-            { note: "G4", dur: E },    // chổi
-            { note: "F4", dur: E },    // to
-            { note: "A4", dur: Q },    // bà
-            { note: "C5", dur: Q },    // làm
-            // Measures 9-12: chổi nhỏ. Chổi to chổi to bà
-            { note: "A4", dur: E },    // chổi
-            { note: "G4", dur: S },    // nhỏ.
-            { note: "F4", dur: S },    // (tie)
-            { note: "G4", dur: E },    // Chổi
-            { note: "C5", dur: S },    // to
-            { note: "C5", dur: S },    // (tie)
-            { note: "A4", dur: E },    // chổi
-            { note: "A4", dur: S },    // to
-            { note: "A4", dur: S },    // (tie)
-            { note: "A4", dur: Q },    // bà
-            // Measures 13-16: quét sân kho ấy còn chổi nhỏ bà
-            { note: "C5", dur: E },    // quét
-            { note: "C5", dur: E },    // sân
-            { note: "A4", dur: E },    // kho
-            { note: "G4", dur: E },    // ấy
-            { note: "F4", dur: E },    // còn
-            { note: "F4", dur: E },    // chổi
-            { note: "G4", dur: S },    // nhỏ
-            { note: "F4", dur: S },    // (tie)
-            { note: "G4", dur: E },    // bà
-            // Repeat section (measures 1-4 again)
-            { note: "C4", dur: Q },    // Một
-            { note: "F4", dur: E },    // sợi
-            { note: "F4", dur: E },    // rơm
-            { note: "G4", dur: E },    // vàng
-            { note: "A4", dur: E },    // là
-            { note: "A4", dur: E },    // hai
-            { note: "G4", dur: E },    // sợi
-            { note: "A4", dur: E },    // vàng
-            { note: "C5", dur: E },    // rơm.
-            // Final measures: nhà nhà.
-            { note: "F4", dur: H },    // nhà
-            { note: "C4", dur: Q },    // Một (repeat indicator)
-            { note: "F4", dur: H },    // nhà.
+            // Entrance: focus note and lead-in (Cấu trúc nốt nhạc)
+            { note: "C4", dur: Q },    // Một (Nhịp lấy đà)
+            // Ô nhịp 1
+            { note: "F4", dur: Q },    // sợi
+            { note: "F4", dur: Q },    // rơm
+            // Ô nhịp 2
+            { note: "G4", dur: Q },    // vàng
+            { note: "A4", dur: Q },    // là
+            // Ô nhịp 3
+            { note: "A4", dur: Q },    // hai
+            { note: "G4", dur: Q },    // sợi
+            // Ô nhịp 4
+            { note: "A4", dur: Q },    // vàng
+            { note: "C5", dur: Q },    // rơm.
+            // Ô nhịp 5
+            { note: "C5", dur: Q },    // Bà
+            { note: "A4", dur: Q },    // bện
+            // Ô nhịp 6
+            { note: "G4", dur: Q },    // chổi
+            { note: "F4", dur: Q },    // chổi
+            // Ô nhịp 7
+            { note: "A4", dur: H },    // to
+            // Ô nhịp 8
+            { note: "C5", dur: H },    // bà
+            // Ô nhịp 9
+            { note: "A4", dur: H },    // làm
+            // Ô nhịp 10
+            { note: "G4", dur: S },    // sol móc kép
+            { note: "F4", dur: S },    // fa móc kép
+            { note: "G4", dur: Q },    // sol đơn
+            { note: "G4", dur: Q },    // nối luyến
+            // Ô nhịp 11
+            { note: "C5", dur: Q },    // Đô
+            { note: "C5", dur: S },    // móc kép
+            { note: "C5", dur: S },    // móc kép
+            { note: "A4", dur: Q },    // Chổi to
+            // Ô nhịp 12
+            { note: "A4", dur: Q },    // La
+            { note: "A4", dur: S },    // móc kép
+            { note: "A4", dur: S },    // móc kép
+            { note: "A4", dur: Q },    // chổi
+            // Ô nhịp 13
+            { note: "A4", dur: H },    // to
+            // Ô nhịp 14
+            { note: "C5", dur: Q },    // Đô
+            { note: "C5", dur: Q },    // Đô
+            // Ô nhịp 15
+            { note: "A4", dur: Q },    // La
+            { note: "G4", dur: Q },    // Sol
+            // Ô nhịp 16
+            { note: "F4", dur: Q },    // Fa
+            { note: "F4", dur: Q },    // Fa
+            // Ô nhịp 17
+            { note: "G4", dur: S },    // Sol
+            { note: "F4", dur: S },    // Fa
+            { note: "G4", dur: Q },    // Sol
+            { note: "F4", dur: Q },    // nhỏ
+            // Ô nhịp 18
+            { note: "G4", dur: Q },    // Sol
+            { note: "G4", dur: Q },    // Sol
+            // Ô nhịp 19
+            { note: "A4", dur: Q },    // La
+            { note: "A4", dur: Q },    // La
+            // Ô nhịp 20
+            { note: "F4", dur: H },    // Fa
+            // Ô nhịp 21
+            { note: "A4", dur: H },    // La
+            // Ô nhịp 22
+            { note: "C5", dur: H },    // Đô
+            // Ô nhịp 23
+            { note: "A4", dur: S },    // La
+            { note: "G4", dur: S },    // Sol
+            { note: "A4", dur: Q },    // quét
+            { note: "A4", dur: Q },    // quét
+            // Khung 1, Ô nhịp 24-25
+            { note: "F4", dur: W },    // nhà
+            { note: "C4", dur: Q },    // Một (nốt nối)
+            // Khung 2, Ô nhịp 26
+            { note: "F4", dur: W },    // nhà.
         ];
 
         // Instrument synth presets using Tone.js
