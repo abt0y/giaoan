@@ -1,539 +1,274 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Music, 
-  BookOpen, 
-  Users, 
-  CheckCircle, 
-  Mic2, 
-  PlayCircle, 
-  Info, 
-  ChevronRight, 
-  Award,
-  Clock,
-  Activity,
-  Heart,
-  Sparkles,
-  Loader2,
-  Volume2,
-  Send
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRES 297: Phương Pháp Dạy Hát - Âm Nhạc Mầm Non</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .animate-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans">
 
-const apiKey = "";
-
-const App = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [completedSteps, setCompletedSteps] = useState([]);
-  const [aiPlan, setAiPlan] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [songName, setSongName] = useState("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [quizAnswers, setQuizAnswers] = useState({});
-  const [quizFeedback, setQuizFeedback] = useState({});
-  const [isEvaluating, setIsEvaluating] = useState({});
-
-  const sections = [
-    { id: 'overview', title: 'Tổng quan', icon: <BookOpen size={20} /> },
-    { id: 'theory', title: 'Cơ sở lý luận', icon: <Activity size={20} /> },
-    { id: 'methods', title: 'Phương pháp', icon: <Music size={20} /> },
-    { id: 'practice', title: 'Quy trình & Thực hành', icon: <Mic2 size={20} /> },
-    { id: 'ai-assistant', title: 'Trợ lý AI ✨', icon: <Sparkles size={20} /> },
-    { id: 'quiz', title: 'Kiểm tra', icon: <CheckCircle size={20} /> },
-  ];
-
-  // API Helper with Exponential Backoff
-  const callGemini = async (prompt, systemInstruction = "", retries = 5) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      systemInstruction: { parts: [{ text: systemInstruction }] }
-    };
-
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) throw new Error('API request failed');
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Không có phản hồi từ AI.";
-      } catch (error) {
-        if (i === retries - 1) throw error;
-        await new Promise(res => setTimeout(res, Math.pow(2, i) * 1000));
-      }
-    }
-  };
-
-  const callGeminiTTS = async (text, voiceName = "Kore") => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-    const payload = {
-      contents: [{ parts: [{ text }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
-      }
-    };
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!pcmBase64) return null;
-
-      const binaryString = window.atob(pcmBase64);
-      const len = binaryString.length;
-      const bytes = new Int16Array(len / 2);
-      for (let i = 0; i < len; i += 2) {
-        bytes[i / 2] = (binaryString.charCodeAt(i + 1) << 8) | binaryString.charCodeAt(i);
-      }
-      return bytes;
-    } catch (e) {
-      console.error(e);
-      return null;
-    }
-  };
-
-  const pcmToWav = (pcmData, sampleRate = 24000) => {
-    const buffer = new ArrayBuffer(44 + pcmData.length * 2);
-    const view = new DataView(buffer);
-    const writeString = (offset, string) => {
-      for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-    };
-    writeString(0, 'RIFF');
-    view.setUint32(4, 32 + pcmData.length * 2, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(36, 'data');
-    view.setUint32(40, pcmData.length * 2, true);
-    for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
-    return new Blob([view], { type: 'audio/wav' });
-  };
-
-  const handleGeneratePlan = async () => {
-    if (!songName) return;
-    setIsGenerating(true);
-    try {
-      const prompt = `Soạn giáo án dạy hát chi tiết cho bài hát "${songName}" theo 5 bước: 1. Luyện thanh, 2. Giới thiệu, 3. Hát mẫu, 4. Dạy hát từng câu (TST), 5. Hoàn thiện. Hãy đưa ra các ví dụ cụ thể về câu hỏi và động tác minh họa phù hợp với trẻ mầm non. Trình bày bằng tiếng Việt, định dạng Markdown rõ ràng.`;
-      const result = await callGemini(prompt, "Bạn là một chuyên gia giáo dục âm nhạc mầm non, dựa trên phương pháp của TS. Lê Tuấn Đức.");
-      setAiPlan(result);
-    } catch (e) {
-      setAiPlan("Lỗi khi gọi AI. Vui lòng thử lại.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleSpeak = async (text) => {
-    setIsSpeaking(true);
-    const pcm = await callGeminiTTS(text);
-    if (pcm) {
-      const wav = pcmToWav(pcm);
-      const audio = new Audio(URL.createObjectURL(wav));
-      audio.play();
-      audio.onended = () => setIsSpeaking(false);
-    } else {
-      setIsSpeaking(false);
-    }
-  };
-
-  const evaluateAnswer = async (index, question, answer) => {
-    if (!answer) return;
-    setIsEvaluating(prev => ({ ...prev, [index]: true }));
-    try {
-      const prompt = `Câu hỏi: "${question}"\nCâu trả lời của sinh viên: "${answer}"\nHãy chấm điểm và nhận xét xem câu trả lời có đúng với phương pháp dạy âm nhạc mầm non của TS. Lê Tuấn Đức không. Đưa ra gợi ý cải thiện nếu cần.`;
-      const result = await callGemini(prompt, "Bạn là trợ lý chấm bài sư phạm âm nhạc.");
-      setQuizFeedback(prev => ({ ...prev, [index]: result }));
-    } catch (e) {
-      setQuizFeedback(prev => ({ ...prev, [index]: "Không thể chấm điểm lúc này." }));
-    } finally {
-      setIsEvaluating(prev => ({ ...prev, [index]: false }));
-    }
-  };
-
-  const toggleStep = (step) => {
-    setCompletedSteps(prev => 
-      prev.includes(step) ? prev.filter(s => s !== step) : [...prev, step]
-    );
-  };
-
-  const renderAiAssistant = () => (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-3xl text-white shadow-xl">
-        <h2 className="text-3xl font-black mb-2 flex items-center gap-3">
-          <Sparkles className="text-yellow-300 fill-yellow-300" /> Trợ lý Sư phạm AI
-        </h2>
-        <p className="text-indigo-100 opacity-90">Ứng dụng trí tuệ nhân tạo để tối ưu hóa việc chuẩn bị bài giảng của bạn.</p>
+<!-- Header -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2zm0 2a8 8 0 100 16 8 8 0 000-16zm1 11h2v2h-2v-2zm-4-3h2v5h-2v-5zm4-3h2v5h-2v-5zm-4 2h2v7h-2v-7z"/>
+        </svg>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Lesson Generator */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Music className="text-blue-500" /> Soạn giáo án nhanh ✨
-          </h3>
-          <div className="flex gap-2 mb-6">
-            <input 
-              type="text" 
-              value={songName}
-              onChange={(e) => setSongName(e.target.value)}
-              placeholder="Nhập tên bài hát (VD: Bé quét nhà)..." 
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button 
-              onClick={handleGeneratePlan}
-              disabled={isGenerating || !songName}
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition-all"
-            >
-              {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-              Soạn ngay ✨
-            </button>
-          </div>
-
-          {aiPlan && (
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 max-h-[400px] overflow-y-auto text-sm leading-relaxed text-slate-700 prose prose-slate">
-              {aiPlan.split('\n').map((line, i) => <p key={i} className="mb-2">{line}</p>)}
-            </div>
-          )}
-        </div>
-
-        {/* Vocal Coach */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Mic2 className="text-pink-500" /> Huấn luyện viên Luyện thanh AI ✨
-          </h3>
-          <p className="text-sm text-slate-500 mb-6">Nghe mẫu cách hướng dẫn trẻ luyện tập các kỹ thuật cơ bản.</p>
-          
-          <div className="space-y-3">
-            {[
-              { label: "Mẫu 'The Cool OO' (Head Voice)", text: "Nào các bạn nhỏ, hãy tưởng tượng mình đang uống nước bằng ống hút, sau đó thở ra nhẹ nhàng như tiếng gió: ôôôô" },
-              { label: "Mẫu 'The Ha-Ha' (Cơ hoành)", text: "Hãy bắt chước chú chó nhỏ thở nhé, đẩy hơi từ bụng lên: ha ha ha ha!" },
-              { label: "Khởi động 'Mi Ma Me'", text: "Cùng cô khởi động môi lưỡi nào: mi ma mê mô mu, mi ma mê mô mu." }
-            ].map((item, i) => (
-              <button
-                key={i}
-                onClick={() => handleSpeak(item.text)}
-                disabled={isSpeaking}
-                className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-blue-50 rounded-xl border border-slate-100 transition-colors group"
-              >
-                <span className="font-medium text-slate-700">{item.label}</span>
-                <Volume2 className={`text-slate-400 group-hover:text-blue-500 ${isSpeaking ? 'animate-pulse' : ''}`} size={20} />
-              </button>
-            ))}
-          </div>
-        </div>
+      <div>
+        <h1 class="text-xl font-black tracking-tight text-slate-800 uppercase">Phương Pháp Dạy Hát</h1>
+        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Giảng dạy bởi TS. Lê Tuấn Đức</p>
       </div>
     </div>
-  );
-
-  const renderQuiz = () => {
-    const questions = [
-      { q: "Thuật ngữ nào chỉ khoảng cao độ thuận lợi nhất để trẻ hát?", a: "Tessitura" },
-      { q: "Phương pháp nào chú trọng vào 'Ký hiệu bàn tay'?", a: "Kodály" },
-      { q: "Model 'Teacher-Student-Teacher' dùng để làm gì?", a: "Điều chỉnh hành vi ngay lập tức" },
-      { q: "Giọng hát nào giáo viên nên hướng trẻ sử dụng?", a: "Head Voice" }
-    ];
-
-    return (
-      <div className="space-y-6 animate-in fade-in duration-500 max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">Kiểm tra kiến thức nhanh</h2>
-          <p className="text-slate-500">Sử dụng AI để nhận xét câu trả lời của bạn</p>
-        </div>
-
-        <div className="space-y-6">
-          {questions.map((item, i) => (
-            <div key={i} className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-              <p className="text-slate-800 font-medium mb-3 italic">Câu {i+1}: {item.q}</p>
-              <div className="flex gap-2 mb-3">
-                <input 
-                  type="text" 
-                  value={quizAnswers[i] || ""}
-                  onChange={(e) => setQuizAnswers(prev => ({ ...prev, [i]: e.target.value }))}
-                  placeholder="Câu trả lời của bạn..." 
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-                <button 
-                  onClick={() => evaluateAnswer(i, item.q, quizAnswers[i])}
-                  disabled={isEvaluating[i] || !quizAnswers[i]}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isEvaluating[i] ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  Chấm điểm ✨
-                </button>
-              </div>
-              {quizFeedback[i] && (
-                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs text-indigo-800 leading-relaxed">
-                  <strong className="block mb-1">Nhận xét AI:</strong>
-                  {quizFeedback[i]}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+    <div class="hidden md:flex items-center gap-2">
+      <span class="text-xs font-bold text-slate-400">Tiến độ:</span>
+      <div class="w-32 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+        <div id="progressBar" class="h-full bg-blue-500 transition-all duration-500" style="width: 0%"></div>
       </div>
-    );
-  };
+    </div>
+  </div>
+</header>
 
-  const renderOverview = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-        <h2 className="text-2xl font-bold text-blue-800 mb-2">PRES 297: Âm nhạc và tổ chức hoạt động giáo dục âm nhạc</h2>
-        <p className="text-blue-600 font-medium">Giảng viên: TS. Lê Tuấn Đức | Ngày: 27/03/2026</p>
+<!-- Main Content -->
+<div class="max-w-6xl mx-auto w-full px-4 py-8 flex flex-col md:flex-row gap-8">
+  
+  <!-- Sidebar Navigation -->
+  <aside class="w-full md:w-64 flex-shrink-0">
+    <nav class="space-y-2 sticky top-24">
+      <button data-tab="overview" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500 active:bg-blue-100 active:border-blue-600 active:text-blue-700">
+        📖 Tổng quan
+      </button>
+      <button data-tab="theory" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500">
+        🔬 Cơ sở lý luận
+      </button>
+      <button data-tab="methods" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500">
+        🎵 Phương pháp
+      </button>
+      <button data-tab="practice" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500">
+        🎤 Quy trình & Thực hành
+      </button>
+      <button data-tab="ai-assistant" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500">
+        ✨ Trợ lý AI
+      </button>
+      <button data-tab="quiz" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-semibold text-slate-600 hover:bg-blue-50 transition-colors border-l-4 border-transparent hover:border-blue-500">
+        ✅ Kiểm tra
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Content Area -->
+  <div class="flex-1">
+    
+    <!-- Overview Tab -->
+    <div id="overview" class="tab-content animate-in fade-in duration-500 space-y-6">
+      <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+        <h2 class="text-2xl font-bold text-blue-800 mb-2">PRES 297: Âm nhạc và tổ chức hoạt động giáo dục âm nhạc</h2>
+        <p class="text-blue-600 font-medium">Giảng viên: TS. Lê Tuấn Đức | Ngày: 27/03/2026</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="flex items-center gap-2 font-bold text-slate-800 mb-4 border-b pb-2">
-            <Award className="text-amber-500" /> Mục tiêu Năng lực
-          </h3>
-          <ul className="space-y-3">
-            {[
-              "Trình bày vai trò ca hát với trẻ mầm non.",
-              "Phân biệt đặc điểm cơ quan phát âm các lứa tuổi.",
-              "Phân tích cấu trúc bài hát mầm non.",
-              "Thực hiện dạy hát theo đúng quy trình 5 bước."
-            ].map((text, i) => (
-              <li key={i} className="flex gap-3 text-slate-600 text-sm italic">
-                <ChevronRight size={16} className="text-blue-500 flex-shrink-0" />
-                {text}
-              </li>
-            ))}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+          <h3 class="flex items-center gap-2 font-bold text-slate-800 mb-4 border-b pb-2">🏆 Mục tiêu Năng lực</h3>
+          <ul class="space-y-3">
+            <li class="flex gap-3 text-slate-600 text-sm italic"><span class="text-blue-500 flex-shrink-0">›</span> Trình bày vai trò ca hát với trẻ mầm non.</li>
+            <li class="flex gap-3 text-slate-600 text-sm italic"><span class="text-blue-500 flex-shrink-0">›</span> Phân biệt đặc điểm cơ quan phát âm các lứa tuổi.</li>
+            <li class="flex gap-3 text-slate-600 text-sm italic"><span class="text-blue-500 flex-shrink-0">›</span> Phân tích cấu trúc bài hát mầm non.</li>
+            <li class="flex gap-3 text-slate-600 text-sm italic"><span class="text-blue-500 flex-shrink-0">›</span> Thực hiện dạy hát theo đúng quy trình 5 bước.</li>
           </ul>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="flex items-center gap-2 font-bold text-slate-800 mb-4 border-b pb-2">
-            <Clock className="text-blue-500" /> Tiến trình bài học (50 phút)
-          </h3>
-          <div className="space-y-4">
-            {[
-              { time: "05'", label: "Nêu vấn đề (Libera - Far Away)" },
-              { time: "10'", label: "Ý nghĩa & Vai trò ca hát" },
-              { time: "07'", label: "Đặc điểm cơ quan phát âm" },
-              { time: "13'", label: "Phương pháp & Quy trình dạy" },
-              { time: "10'", label: "Thực hành nhóm" },
-              { time: "05'", label: "Tổng kết & Giao bài tập" }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{item.time}</span>
-                <span className="text-slate-700">{item.label}</span>
-              </div>
-            ))}
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+          <h3 class="flex items-center gap-2 font-bold text-slate-800 mb-4 border-b pb-2">⏱️ Tiến trình bài học (50 phút)</h3>
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">05'</span> <span class="text-slate-700">Nêu vấn đề (Libera - Far Away)</span></div>
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">10'</span> <span class="text-slate-700">Ý nghĩa & Vai trò ca hát</span></div>
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">07'</span> <span class="text-slate-700">Đặc điểm cơ quan phát âm</span></div>
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">13'</span> <span class="text-slate-700">Phương pháp & Quy trình dạy</span></div>
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">10'</span> <span class="text-slate-700">Thực hành nhóm</span></div>
+            <div class="flex items-center justify-between"><span class="bg-slate-100 px-3 py-1 rounded font-mono text-slate-500 font-bold">05'</span> <span class="text-slate-700">Tổng kết & Giao bài tập</span></div>
           </div>
         </div>
       </div>
     </div>
-  );
 
-  const renderTheory = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-indigo-900 text-white p-6 rounded-2xl shadow-lg">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Info /> 10 Chức năng của Âm nhạc (Alan Merriam)
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            "Cảm xúc", "Thẩm mỹ", "Giải trí", "Giao tiếp", "Biểu trưng",
-            "Vận động", "Chuẩn mực", "Nghi lễ", "Văn hóa", "Gắn kết"
-          ].map((func, i) => (
-            <div key={i} className="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700">
-              {func}
-            </div>
-          ))}
+    <!-- Theory Tab -->
+    <div id="theory" class="tab-content hidden animate-in fade-in duration-500 space-y-6">
+      <div class="bg-indigo-900 text-white p-6 rounded-2xl shadow-lg">
+        <h3 class="text-xl font-bold mb-4">ℹ️ 10 Chức năng của Âm nhạc (Alan Merriam)</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Cảm xúc</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Thẩm mỹ</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Giải trí</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Giao tiếp</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Biểu trưng</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Vận động</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Chuẩn mực</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Nghi lễ</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Văn hóa</div>
+          <div class="bg-indigo-800/50 p-2 rounded text-center text-xs border border-indigo-700 font-semibold">Gắn kết</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="font-bold text-slate-800">Bảng tra cứu Âm vực theo độ tuổi</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-              <tr>
-                <th className="px-4 py-3">Độ tuổi</th>
-                <th className="px-4 py-3">Tầm tiếng (Range)</th>
-                <th className="px-4 py-3">Âm vực (Tessitura)</th>
-                <th className="px-4 py-3">Hành vi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                { age: 'Dưới 1 tuổi', range: 'Không xác định', tessitura: 'Không ổn định', behavior: 'Bập bẹ nguyên âm/phụ âm' },
-                { age: '2 tuổi', range: 'Hẹp (Q2, Q3)', tessitura: 'Không ổn định', behavior: 'Bắt chước cao độ rời rạc' },
-                { age: '3 tuổi', range: 'Mở rộng dần', tessitura: 'Nốt trung tâm', behavior: 'Sáng tạo bài hát rời rạc' },
-                { age: '4-5 tuổi', range: 'd đến a', tessitura: 'Hẹp', behavior: 'Dùng "giọng hét" (playground yell)' },
-                { age: '6-7 tuổi', range: 'C đến b', tessitura: 'Nhỏ hơn tầm tiếng', behavior: 'Kiểm soát head voice' },
-                { age: '8-12 tuổi', range: 'G đến g\'', tessitura: 'C đến c\'', behavior: 'Cộng hưởng tốt, thay đổi giọng' },
-              ].map((row, i) => (
-                <tr key={i} className="hover:bg-blue-50 transition-colors">
-                  <td className="px-4 py-3 font-bold text-blue-700">{row.age}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.range}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.tessitura}</td>
-                  <td className="px-4 py-3 text-slate-500 italic">{row.behavior}</td>
-                </tr>
-              ))}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200"><h3 class="font-bold text-slate-800">Bảng tra cứu Âm vực theo độ tuổi</h3></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm"><thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider"><tr><th class="px-4 py-3">Độ tuổi</th><th class="px-4 py-3">Tầm tiếng</th><th class="px-4 py-3">Âm vực</th><th class="px-4 py-3">Hành vi</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">Dưới 1 tuổi</td><td class="px-4 py-3 text-slate-600">Không xác định</td><td class="px-4 py-3 text-slate-600">Không ổn định</td><td class="px-4 py-3 text-slate-500 italic">Bập bẹ nguyên âm/phụ âm</td></tr>
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">2 tuổi</td><td class="px-4 py-3 text-slate-600">Hẹp (Q2, Q3)</td><td class="px-4 py-3 text-slate-600">Không ổn định</td><td class="px-4 py-3 text-slate-500 italic">Bắt chước cao độ rời rạc</td></tr>
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">3 tuổi</td><td class="px-4 py-3 text-slate-600">Mở rộng dần</td><td class="px-4 py-3 text-slate-600">Nốt trung tâm</td><td class="px-4 py-3 text-slate-500 italic">Sáng tạo bài hát rời rạc</td></tr>
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">4-5 tuổi</td><td class="px-4 py-3 text-slate-600">d đến a</td><td class="px-4 py-3 text-slate-600">Hẹp</td><td class="px-4 py-3 text-slate-500 italic">Dùng "giọng hét"</td></tr>
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">6-7 tuổi</td><td class="px-4 py-3 text-slate-600">C đến b</td><td class="px-4 py-3 text-slate-600">Nhỏ hơn tầm tiếng</td><td class="px-4 py-3 text-slate-500 italic">Kiểm soát head voice</td></tr>
+              <tr class="hover:bg-blue-50"><td class="px-4 py-3 font-bold text-blue-700">8-12 tuổi</td><td class="px-4 py-3 text-slate-600">G đến g'</td><td class="px-4 py-3 text-slate-600">C đến c'</td><td class="px-4 py-3 text-slate-500 italic">Cộng hưởng tốt</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
-  );
 
-  const renderMethods = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { 
-            name: "Dalcroze", 
-            color: "blue", 
-            core: "Eurhythmics", 
-            desc: "Vận động là gốc rễ của sự cảm thụ âm nhạc.",
-            tool: "Phản xạ cơ thể, nhịp điệu piano."
-          },
-          { 
-            name: "Kodály", 
-            color: "indigo", 
-            core: "Audiation", 
-            desc: "Phát triển tai nghe nội tâm và kỹ năng đọc nhạc.",
-            tool: "Ký hiệu bàn tay, Solfège di động."
-          },
-          { 
-            name: "Orff-Schulwerk", 
-            color: "purple", 
-            core: "Elemental Music", 
-            desc: "Âm nhạc nguyên sơ: hát, nói, nhảy múa tự do.",
-            tool: "Nhạc cụ gõ Orff, Body percussion."
-          }
-        ].map((m, i) => (
-          <div key={i} className={`bg-${m.color}-50 border border-${m.color}-100 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow`}>
-            <div className={`text-${m.color}-600 mb-2 font-black text-xl uppercase tracking-tighter`}>{m.name}</div>
-            <div className={`inline-block px-2 py-1 rounded bg-${m.color}-100 text-${m.color}-700 text-xs font-bold mb-4 uppercase`}>
-              {m.core}
-            </div>
-            <p className="text-slate-700 text-sm mb-4 leading-relaxed">{m.desc}</p>
-            <div className="text-xs font-bold text-slate-400 uppercase mb-2">Công cụ đặc trưng:</div>
-            <p className="text-slate-600 text-sm italic">{m.tool}</p>
-          </div>
-        ))}
+    <!-- Methods Tab -->
+    <div id="methods" class="tab-content hidden animate-in fade-in duration-500 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-blue-50 border border-blue-100 p-6 rounded-2xl shadow-sm"><div class="text-blue-600 mb-2 font-black text-xl uppercase">Dalcroze</div> <div class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold mb-4 uppercase">Eurhythmics</div> <p class="text-slate-700 text-sm mb-4">Vận động là gốc rễ của sự cảm thụ âm nhạc.</p> <div class="text-xs font-bold text-slate-400 uppercase mb-2">Công cụ đặc trưng:</div> <p class="text-slate-600 text-sm italic">Phản xạ cơ thể, nhịp điệu piano.</p></div>
+        <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl shadow-sm"><div class="text-indigo-600 mb-2 font-black text-xl uppercase">Kodály</div> <div class="inline-block px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-bold mb-4 uppercase">Audiation</div> <p class="text-slate-700 text-sm mb-4">Phát triển tai nghe nội tâm và kỹ năng đọc nhạc.</p> <div class="text-xs font-bold text-slate-400 uppercase mb-2">Công cụ đặc trưng:</div> <p class="text-slate-600 text-sm italic">Ký hiệu bàn tay, Solfège di động.</p></div>
+        <div class="bg-purple-50 border border-purple-100 p-6 rounded-2xl shadow-sm"><div class="text-purple-600 mb-2 font-black text-xl uppercase">Orff-Schulwerk</div> <div class="inline-block px-2 py-1 rounded bg-purple-100 text-purple-700 text-xs font-bold mb-4 uppercase">Elemental Music</div> <p class="text-slate-700 text-sm mb-4">Âm nhạc nguyên sơ: hát, nói, nhảy múa tự do.</p> <div class="text-xs font-bold text-slate-400 uppercase mb-2">Công cụ đặc trưng:</div> <p class="text-slate-600 text-sm italic">Nhạc cụ gõ Orff, Body percussion.</p></div>
       </div>
     </div>
-  );
 
-  const renderPractice = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <CheckCircle className="text-green-500" /> Quy trình 5 bước tổ chức hoạt động
-        </h3>
-        
-        <div className="space-y-4">
-          {[
-            { step: 1, title: "Luyện thanh (Vocal Warm-up)", desc: "Môi, lưỡi, nguyên âm (mi ma mê mô mu). Bài tập 'The Ha-Ha' và 'The Cool OO'." },
-            { step: 2, title: "Giới thiệu bài hát", desc: "Dùng câu chuyện, tranh ảnh, rối hoặc tình huống để tạo hứng thú." },
-            { step: 3, title: "Hát mẫu & Cảm thụ", desc: "Hát mẫu chuẩn xác bằng Head voice, kết hợp nhạc cụ đệm (Piano/Guitar)." },
-            { step: 4, title: "Dạy hát từng câu (TST Model)", desc: "Cô hát mẫu - Trẻ nhắc lại - Cô phản hồi. Ghép nối dần các câu nhạc." },
-            { step: 5, title: "Hát hoàn thiện & Biểu cảm", desc: "Hát cả bài với nhạc cụ gõ, vận động minh họa hoặc hát đối đáp." },
-          ].map((item) => (
-            <div 
-              key={item.step} 
-              onClick={() => toggleStep(item.step)}
-              className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-4 ${
-                completedSteps.includes(item.step) ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100 hover:border-blue-200'
-              }`}
-            >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${
-                completedSteps.includes(item.step) ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'
-              }`}>
-                {item.step}
-              </div>
-              <div>
-                <h4 className={`font-bold ${completedSteps.includes(item.step) ? 'text-green-800' : 'text-slate-800'}`}>
-                  {item.title}
-                </h4>
-                <p className="text-sm text-slate-500 mt-1">{item.desc}</p>
-              </div>
-            </div>
-          ))}
+    <!-- Practice Tab -->
+    <div id="practice" class="tab-content hidden animate-in fade-in duration-500 space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <h3 class="text-xl font-bold text-slate-800 mb-6">✅ Quy trình 5 bước tổ chức hoạt động</h3>
+        <div class="space-y-4">
+          <div class="practice-step p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 cursor-pointer flex items-start gap-4" data-step="1"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold bg-slate-200 text-slate-500">1</div><div><h4 class="font-bold text-slate-800">Luyện thanh (Vocal Warm-up)</h4><p class="text-sm text-slate-500 mt-1">Môi, lưỡi, nguyên âm (mi ma mê mô mu). Bài tập 'The Ha-Ha' và 'The Cool OO'.</p></div></div>
+          <div class="practice-step p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 cursor-pointer flex items-start gap-4" data-step="2"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold bg-slate-200 text-slate-500">2</div><div><h4 class="font-bold text-slate-800">Giới thiệu bài hát</h4><p class="text-sm text-slate-500 mt-1">Dùng câu chuyện, tranh ảnh, rối hoặc tình huống để tạo hứng thú.</p></div></div>
+          <div class="practice-step p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 cursor-pointer flex items-start gap-4" data-step="3"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold bg-slate-200 text-slate-500">3</div><div><h4 class="font-bold text-slate-800">Hát mẫu & Cảm thụ</h4><p class="text-sm text-slate-500 mt-1">Hát mẫu chuẩn xác bằng Head voice, kết hợp nhạc cụ đệm (Piano/Guitar).</p></div></div>
+          <div class="practice-step p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 cursor-pointer flex items-start gap-4" data-step="4"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold bg-slate-200 text-slate-500">4</div><div><h4 class="font-bold text-slate-800">Dạy hát từng câu (TST Model)</h4><p class="text-sm text-slate-500 mt-1">Cô hát mẫu - Trẻ nhắc lại - Cô phản hồi. Ghép nối dần các câu nhạc.</p></div></div>
+          <div class="practice-step p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-200 cursor-pointer flex items-start gap-4" data-step="5"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold bg-slate-200 text-slate-500">5</div><div><h4 class="font-bold text-slate-800">Hát hoàn thiện & Biểu cảm</h4><p class="text-sm text-slate-500 mt-1">Hát cả bài với nhạc cụ gõ, vận động minh họa hoặc hát đối đáp.</p></div></div>
         </div>
       </div>
     </div>
-  );
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
-              <Music size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-800 uppercase">Phương Pháp Dạy Hát</h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Giảng dạy bởi TS. Lê Tuấn Đức</p>
-            </div>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">Tiến độ bài học:</span>
-            <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-              <div 
-                className="h-full bg-blue-500 transition-all duration-500" 
-                style={{ width: `${(completedSteps.length / 5) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto w-full px-4 py-8 flex flex-col md:flex-row gap-8">
-        <nav className="md:w-64 flex-shrink-0 space-y-2">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveTab(section.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-bold text-sm ${
-                activeTab === section.id 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' 
-                  : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-100'
-              }`}
-            >
-              {section.icon}
-              {section.title}
-            </button>
-          ))}
-        </nav>
-
-        <main className="flex-1 bg-white p-2 md:p-0">
-          <div className="pb-10">
-            {activeTab === 'overview' && renderOverview()}
-            {activeTab === 'theory' && renderTheory()}
-            {activeTab === 'methods' && renderMethods()}
-            {activeTab === 'practice' && renderPractice()}
-            {activeTab === 'ai-assistant' && renderAiAssistant()}
-            {activeTab === 'quiz' && renderQuiz()}
-          </div>
-        </main>
+    <!-- AI Assistant Tab -->
+    <div id="ai-assistant" class="tab-content hidden animate-in fade-in duration-500 space-y-8">
+      <div class="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-3xl text-white shadow-xl">
+        <h2 class="text-3xl font-black mb-2">✨ Trợ lý Sư phạm AI</h2>
+        <p class="text-indigo-100 opacity-90"><strong>⚠️ Lưu ý:</strong> Tính năng AI yêu cầu API key của Google Gemini. Vui lòng thêm API key của bạn vào mã để sử dụng các tính năng này.</p>
       </div>
-
-      <footer className="mt-auto border-t border-slate-200 bg-white py-6">
-        <div className="max-w-6xl mx-auto px-4 text-center text-slate-400 text-xs font-medium">
-          <p>© 2026 TS. Lê Tuấn Đức - Đại học Sư phạm Hà Nội | Hỗ trợ bởi Gemini AI ✨</p>
-        </div>
-      </footer>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 class="font-bold text-slate-800 mb-4">🎵 Soạn giáo án nhanh ✨</h3>
+        <p class="text-xs text-slate-400 italic">API key chưa được cấu hình. Tính năng này tạm thời vô hiệu hóa.</p>
+      </div>
     </div>
-  );
-};
 
-export default App;
+    <!-- Quiz Tab -->
+    <div id="quiz" class="tab-content hidden animate-in fade-in duration-500 space-y-6 max-w-2xl">
+      <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-slate-800">Kiểm tra kiến thức nhanh</h2>
+        <p class="text-slate-500">Sử dụng AI để nhận xét câu trả lời của bạn</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+        <p class="text-slate-800 font-medium mb-3 italic">Câu 1: Thuật ngữ nào chỉ khoảng cao độ thuận lợi nhất để trẻ hát?</p>
+        <div class="flex gap-2 mb-3"><input type="text" placeholder="Câu trả lời của bạn..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" disabled /> <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-50" disabled>✨ Chấm điểm</button></div>
+        <p class="text-xs text-slate-400 italic">🔒 API key chưa cấu hình.</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+        <p class="text-slate-800 font-medium mb-3 italic">Câu 2: Phương pháp nào chú trọng vào 'Ký hiệu bàn tay'?</p>
+        <div class="flex gap-2 mb-3"><input type="text" placeholder="Câu trả lời của bạn..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" disabled /> <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-50" disabled>✨ Chấm điểm</button></div>
+        <p class="text-xs text-slate-400 italic">🔒 API key chưa cấu hình.</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+        <p class="text-slate-800 font-medium mb-3 italic">Câu 3: Model 'Teacher-Student-Teacher' dùng để làm gì?</p>
+        <div class="flex gap-2 mb-3"><input type="text" placeholder="Câu trả lời của bạn..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" disabled /> <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-50" disabled>✨ Chấm điểm</button></div>
+        <p class="text-xs text-slate-400 italic">🔒 API key chưa cấu hình.</p>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+        <p class="text-slate-800 font-medium mb-3 italic">Câu 4: Giọng hát nào giáo viên nên hướng trẻ sử dụng?</p>
+        <div class="flex gap-2 mb-3"><input type="text" placeholder="Câu trả lời của bạn..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" disabled /> <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-50" disabled>✨ Chấm điểm</button></div>
+        <p class="text-xs text-slate-400 italic">🔒 API key chưa cấu hình.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-white border-t border-slate-200 mt-12">
+  <div class="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-slate-500">
+    <p>PRES 297: Phương Pháp Dạy Hát Âm Nhạc Mầm Non | Giảng viên: TS. Lê Tuấn Đức</p>
+  </div>
+</footer>
+
+<script>
+// Tab Navigation
+const tabButtons = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+let completedSteps = new Set();
+
+function updateProgressBar() {
+  const percentage = (completedSteps.size / 5) * 100;
+  document.getElementById('progressBar').style.width = percentage + '%';
+}
+
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabId = btn.getAttribute('data-tab');
+    
+    // Remove active state from all buttons
+    tabButtons.forEach(b => {
+      b.classList.remove('active:bg-blue-100', 'active:border-blue-600', 'active:text-blue-700');
+      b.style.borderLeftColor = 'transparent';
+    });
+    
+    // Hide all tab contents
+    tabContents.forEach(content => content.classList.add('hidden'));
+    
+    // Show active tab content
+    document.getElementById(tabId).classList.remove('hidden');
+    
+    // Set active button styles
+    btn.style.borderLeftColor = '#2563eb';
+    btn.classList.add('bg-blue-100', 'text-blue-700');
+  });
+});
+
+// Set first tab active on load
+if (tabButtons.length > 0) {
+  tabButtons[0].click();
+}
+
+// Practice steps toggle
+document.querySelectorAll('.practice-step').forEach(step => {
+  step.addEventListener('click', () => {
+    const stepNum = parseInt(step.getAttribute('data-step'));
+    const stepDiv = step.querySelector('div:first-child');
+    
+    if (completedSteps.has(stepNum)) {
+      completedSteps.delete(stepNum);
+      step.classList.remove('bg-green-50', 'border-green-200');
+      step.classList.add('bg-slate-50', 'border-slate-100');
+      stepDiv.classList.remove('bg-green-500', 'text-white');
+      stepDiv.classList.add('bg-slate-200', 'text-slate-500');
+    } else {
+      completedSteps.add(stepNum);
+      step.classList.remove('bg-slate-50', 'border-slate-100');
+      step.classList.add('bg-green-50', 'border-green-200');
+      stepDiv.classList.remove('bg-slate-200', 'text-slate-500');
+      stepDiv.classList.add('bg-green-500', 'text-white');
+    }
+    updateProgressBar();
+  });
+});
+</script>
+
+</body>
+</html>
+</html>
