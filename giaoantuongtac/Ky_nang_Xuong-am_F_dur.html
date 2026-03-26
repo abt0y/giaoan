@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giáo án Tương tác: Kỹ năng Xướng âm giọng Fa trưởng (F dur)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Warm Educational Neutrals (Stone-50 background, Slate-800 text, Emerald-600 & Amber-500 accents for a calm, focused learning environment) -->
+    <!-- Application Structure Plan: The SPA is structured as an interactive "Teacher's Dashboard". It moves from high-level goals (Radar Chart) to theoretical foundations (Interactive Scale), then to the core lesson execution (Interactive Timeline), and finally to pedagogy/practice (Tabbed Interface). This non-linear structure allows the user to explore the lesson plan based on their immediate need (e.g., reviewing theory vs. checking the timeline) rather than reading a static document. -->
+    <!-- Visualization & Content Choices: 1. Objectives -> Goal: Inform/Compare -> Viz: Radar Chart (Chart.js) -> Justification: Visually balances the 5 competencies. 2. F Major Structure -> Goal: Inform/Organize -> Viz: Interactive HTML/CSS Blocks -> Justification: Allows users to click and see intervals/functions without SVG. 3. Lesson Timeline -> Goal: Process/Change -> Viz: Interactive Step UI -> Justification: Condenses a large table into an exploratory flow. 4. Pedagogy -> Goal: Organize -> Viz: Tabs -> Justification: Keeps the UI clean while offering deep dives into methods. Confirming NO SVG/Mermaid. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            background-color: #fafaf9;
+            color: #1e293b;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+
+        .piano-key-container {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .music-note-block {
+            width: 60px;
+            height: 80px;
+            background-color: #ffffff;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .music-note-block:hover, .music-note-block.active {
+            background-color: #10b981;
+            color: white;
+            border-color: #059669;
+            transform: translateY(-4px);
+        }
+
+        .interval-bridge {
+            height: 20px;
+            border-bottom: 2px dashed #94a3b8;
+            border-left: 2px dashed #94a3b8;
+            border-right: 2px dashed #94a3b8;
+            margin: 0 30px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 2px;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .nav-link.active {
+            border-bottom: 2px solid #10b981;
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .timeline-btn.active {
+            background-color: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+
+        .tab-btn.active {
+            background-color: #f1f5f9;
+            border-bottom: 2px solid #f59e0b;
+            color: #b45309;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur shadow-sm">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="text-xl font-bold text-emerald-700 flex items-center gap-2">
+                    <span class="text-2xl">&#9835;</span> MUS201
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <a href="#tong-quan" class="nav-link text-slate-600 hover:text-emerald-600 px-3 py-2 transition-colors">Tổng quan</a>
+                    <a href="#ly-thuyet" class="nav-link text-slate-600 hover:text-emerald-600 px-3 py-2 transition-colors">Lý thuyết</a>
+                    <a href="#tien-trinh" class="nav-link text-slate-600 hover:text-emerald-600 px-3 py-2 transition-colors">Tiến trình</a>
+                    <a href="#phuong-phap" class="nav-link text-slate-600 hover:text-emerald-600 px-3 py-2 transition-colors">Phương pháp</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="bg-slate-800 text-white py-16 px-4">
+        <div class="max-w-5xl mx-auto text-center">
+            <p class="text-emerald-400 font-semibold tracking-wider uppercase mb-2">Giáo dục Âm nhạc Mầm non</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">Kỹ năng Xướng âm <br/> Giọng Fa trưởng (F dur)</h1>
+            <div class="flex flex-wrap justify-center gap-6 mt-8 text-slate-300">
+                <div class="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full">
+                    <span class="text-lg">&#9202;</span> 50 Phút
+                </div>
+                <div class="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full">
+                    <span class="text-lg">&#128101;</span> Sĩ số: 40 SV (Năm 2)
+                </div>
+                <div class="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full">
+                    <span class="text-lg">&#128218;</span> Bài 4 (Sau C dur, G dur)
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-12 space-y-24">
+
+        <section id="tong-quan" class="scroll-mt-20">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-800 mb-4">Tổng quan & Mục tiêu</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Phần này trình bày tóm tắt các năng lực cốt lõi mà sinh viên cần đạt được sau 50 phút của bài học, tập trung vào khả năng phân tích, thực hành và làm việc nhóm trong môi trường âm nhạc.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="chart-container">
+                        <canvas id="competencyChart"></canvas>
+                    </div>
+                </div>
+                <div class="space-y-6">
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-5 rounded-r-lg">
+                        <h3 class="text-xl font-bold text-emerald-800 mb-2">Năng lực Đạt được</h3>
+                        <ul class="space-y-2 text-slate-700">
+                            <li><strong class="text-emerald-700">Nhận biết:</strong> Dấu hóa suốt Bb, âm chủ F.</li>
+                            <li><strong class="text-emerald-700">Phân tích:</strong> Cấu trúc T-T-S-T-T-T-S và bậc I-IV-V.</li>
+                            <li><strong class="text-emerald-700">Thực hành:</strong> Xướng âm đúng cao độ, âm vực quãng 9.</li>
+                            <li><strong class="text-emerald-700">Ứng dụng:</strong> Đọc nhạc độc lập, dùng Hand signs (Kodály).</li>
+                            <li><strong class="text-emerald-700">Hợp tác:</strong> Đọc bè đuổi (canon) đơn giản.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-lg">
+                        <h3 class="text-xl font-bold text-amber-800 mb-2">Phẩm chất Phát triển</h3>
+                        <p class="text-slate-700">Kiên trì rèn luyện tai nghe (ear training) và phát triển tư duy âm nhạc nội tại (<strong>audiation</strong>), gia tăng độ nhạy cảm thẩm mỹ với âm sắc giọng trưởng.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="ly-thuyet" class="scroll-mt-20">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-800 mb-4">Cơ sở Lý luận Giọng F dur</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Tương tác với các khối âm thanh dưới đây để hiểu rõ cấu trúc cung/nửa cung (T-T-S-T-T-T-S) và các bậc chức năng quan trọng (Tonic, Subdominant, Dominant) của giọng Fa trưởng.</p>
+            </div>
+
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                
+                <div class="piano-key-container" id="scaleContainer">
+                </div>
+
+                <div class="mt-10 text-center min-h-[120px]" id="scaleDetailBox">
+                    <p class="text-slate-500 italic">Di chuột hoặc nhấp vào các nốt nhạc ở trên để xem chi tiết phân tích.</p>
+                </div>
+
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div class="p-4 bg-slate-50 rounded-xl">
+                        <div class="text-2xl mb-2 text-slate-700">&#119070;</div>
+                        <h4 class="font-bold text-slate-800">Dấu hóa suốt</h4>
+                        <p class="text-sm text-slate-600 mt-1">1 dấu Giáng (Bb) để đảm bảo khoảng cách nửa cung giữa bậc III-IV.</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-xl">
+                        <div class="text-2xl mb-2 text-emerald-600">&#9899;</div>
+                        <h4 class="font-bold text-slate-800">Tonal Center</h4>
+                        <p class="text-sm text-slate-600 mt-1">Âm chủ F là trọng tâm, vạn vật âm nhạc đều có xu hướng giải quyết về F.</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-xl">
+                        <div class="text-2xl mb-2 text-amber-500">&#8644;</div>
+                        <h4 class="font-bold text-slate-800">So với C dur</h4>
+                        <p class="text-sm text-slate-600 mt-1">Cùng cấu trúc nhưng dịch lên một quãng 4 đúng (Perfect 4th).</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tien-trinh" class="scroll-mt-20">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-800 mb-4">Tiến trình Giảng dạy (50 Phút)</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Khám phá chi tiết các hoạt động trong lớp học. Nhấp vào từng mốc thời gian để xem cụ thể vai trò của Giảng viên và Sinh viên.</p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-8">
+                <div class="lg:w-1/3 flex flex-col gap-3" id="timelineButtons">
+                </div>
+
+                <div class="lg:w-2/3">
+                    <div class="bg-white p-8 rounded-2xl shadow-lg border border-slate-100 h-full flex flex-col justify-center transition-all duration-300" id="timelineContent">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="phuong-phap" class="scroll-mt-20">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-800 mb-4">Phương pháp & Bài tập Thực hành</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Hệ thống hóa các phương pháp sư phạm cốt lõi áp dụng trong bài giảng và các mẫu bài tập xướng âm thực hành dành cho sinh viên.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="flex border-b border-slate-200 overflow-x-auto" id="tabHeader">
+                    <button class="tab-btn active px-6 py-4 text-sm md:text-base whitespace-nowrap focus:outline-none transition-colors" data-target="tab-kodaly">Phương pháp Kodály</button>
+                    <button class="tab-btn px-6 py-4 text-sm md:text-base whitespace-nowrap text-slate-500 hover:text-slate-800 focus:outline-none transition-colors" data-target="tab-tst">Mô hình TST</button>
+                    <button class="tab-btn px-6 py-4 text-sm md:text-base whitespace-nowrap text-slate-500 hover:text-slate-800 focus:outline-none transition-colors" data-target="tab-practice">Bài tập Xướng âm</button>
+                </div>
+
+                <div class="p-8">
+                    <div id="tab-kodaly" class="tab-content block animate-fade-in">
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Solfège & Hand Signs (Kodály)</h3>
+                        <p class="text-slate-700 mb-4">Sử dụng hệ thống Solfège cố định (Fixed Do) kết hợp ký hiệu bàn tay. Điều này đặc biệt quan trọng trong giáo dục mầm non.</p>
+                        <ul class="list-disc pl-6 space-y-2 text-slate-600">
+                            <li><strong>Thị giác:</strong> Quan sát ký hiệu tay của giáo viên.</li>
+                            <li><strong>Thính giác:</strong> Cảm nhận độ cao âm thanh.</li>
+                            <li><strong>Vận động:</strong> Tự thực hiện ký hiệu tay để ghi nhớ không gian âm nhạc.</li>
+                            <li><strong>Audiation:</strong> Phát triển khả năng "nghe thầm" nốt nhạc trong đầu (đặc biệt là nốt Bb) trước khi phát ra âm thanh.</li>
+                        </ul>
+                    </div>
+
+                    <div id="tab-tst" class="tab-content hidden animate-fade-in">
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Teacher – Student – Teacher (TST)</h3>
+                        <p class="text-slate-700 mb-4">Khung giảng dạy phản hồi tức thì, giúp khắc phục ngay lập tức các lỗi sai về cao độ, đặc biệt là quãng 4 đúng (F-Bb) thường bị sinh viên hát nhầm thành F-B tự nhiên.</p>
+                        <div class="flex flex-col gap-4 mt-6">
+                            <div class="bg-emerald-50 p-4 rounded-lg flex items-start gap-4">
+                                <div class="bg-emerald-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">T</div>
+                                <div>
+                                    <h4 class="font-bold text-emerald-900">Teacher (Đọc mẫu)</h4>
+                                    <p class="text-emerald-700 text-sm">Giảng viên đóng vai trò là "chuẩn âm", xướng âm mẫu rõ ràng, chuẩn xác.</p>
+                                </div>
+                            </div>
+                            <div class="bg-amber-50 p-4 rounded-lg flex items-start gap-4 ml-8">
+                                <div class="bg-amber-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">S</div>
+                                <div>
+                                    <h4 class="font-bold text-amber-900">Student (Thực hành)</h4>
+                                    <p class="text-amber-700 text-sm">Sinh viên lặp lại theo mẫu (Imitation) kết hợp gõ phách.</p>
+                                </div>
+                            </div>
+                            <div class="bg-emerald-50 p-4 rounded-lg flex items-start gap-4">
+                                <div class="bg-emerald-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">T</div>
+                                <div>
+                                    <h4 class="font-bold text-emerald-900">Teacher (Sửa lỗi)</h4>
+                                    <p class="text-emerald-700 text-sm">Giảng viên đánh giá, điều chỉnh ngay lập tức và củng cố lại mẫu đúng.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-practice" class="tab-content hidden animate-fade-in">
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4">Mẫu Luyện tập Đề nghị</h3>
+                        <p class="text-slate-700 mb-6">Bốn bước rèn luyện: Nghe (Listen) &#8594; Nhại (Imitate) &#8594; Nhận diện (Identify) &#8594; Đọc độc lập.</p>
+                        
+                        <div class="space-y-6">
+                            <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <h4 class="font-bold text-slate-800 mb-2">1. Chuyển động liền bậc (Stepwise motion)</h4>
+                                <div class="font-mono bg-white p-3 rounded border text-lg tracking-widest text-center shadow-inner">
+                                    F - G - A - B&#9837; - | C - B&#9837; - A - G | F - - - ||
+                                </div>
+                            </div>
+                            
+                            <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <h4 class="font-bold text-slate-800 mb-2">2. Nhận diện quãng (Interval recognition)</h4>
+                                <div class="font-mono bg-white p-3 rounded border text-lg tracking-widest text-center shadow-inner">
+                                    F - A - F - | G - B&#9837; - G - | A - C - A - | F - - - ||
+                                </div>
+                            </div>
+
+                            <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <h4 class="font-bold text-slate-800 mb-2">3. Bài tập về nhà</h4>
+                                <ul class="list-decimal pl-5 text-slate-600 space-y-1">
+                                    <li>Luyện tập Gam F dur và quãng 3 cách quãng.</li>
+                                    <li>Chép lại bài đọc nhạc số 2 (trang 45 giáo trình) vào vở nhạc.</li>
+                                    <li>Quay video cá nhân xướng âm bài mẫu kèm gõ phách gửi qua LMS.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-8 text-center mt-12">
+        <p>Giáo án Giảng dạy Đại học &bull; Chuyên ngành Giáo dục Âm nhạc Mầm non</p>
+        <p class="text-sm mt-2">Dựa trên Giáo trình Giáo dục Âm nhạc - tập 1, NXB ĐHSP Hà Nội</p>
+    </footer>
+
+    <script>
+        const navLinks = document.querySelectorAll('.nav-link');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            const sections = document.querySelectorAll('section');
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').substring(1) === current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        const ctx = document.getElementById('competencyChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Nhận biết', 'Phân tích', 'Thực hành', 'Ứng dụng', 'Hợp tác'],
+                datasets: [{
+                    label: 'Trọng tâm Năng lực Bài học',
+                    data: [85, 80, 100, 90, 75],
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    pointBackgroundColor: 'rgba(245, 158, 11, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(245, 158, 11, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                        pointLabels: {
+                            font: { size: 14, family: "'Segoe UI', sans-serif" },
+                            color: '#475569'
+                        },
+                        ticks: { display: false, min: 0, max: 100 }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { family: "'Segoe UI', sans-serif" } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': Mức độ ưu tiên cao';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        const fMajorScale = [
+            { note: 'F', degree: 'I', func: 'Tonic (Âm chủ)', desc: 'Sự ổn định tuyệt đối.', step: 'Bắt đầu' },
+            { note: 'G', degree: 'II', func: 'Supertonic', desc: 'Bước chuyển tiếp nhẹ.', step: '1 Cung (T)' },
+            { note: 'A', degree: 'III', func: 'Mediant', desc: 'Xác định màu sắc trưởng (sáng).', step: '1 Cung (T)' },
+            { note: 'B&#9837;', degree: 'IV', func: 'Subdominant', desc: 'Sự mở rộng, hướng ngoại.', step: 'Nửa cung (S)' },
+            { note: 'C', degree: 'V', func: 'Dominant', desc: 'Sự căng thẳng, hút về âm chủ.', step: '1 Cung (T)' },
+            { note: 'D', degree: 'VI', func: 'Submediant', desc: 'Màu sắc thứ tương đối.', step: '1 Cung (T)' },
+            { note: 'E', degree: 'VII', func: 'Leading Tone', desc: 'Cực kỳ căng thẳng, đòi giải quyết.', step: '1 Cung (T)' },
+            { note: 'F', degree: 'VIII', func: 'Tonic', desc: 'Giải quyết hoàn toàn, kết thúc.', step: 'Nửa cung (S)' }
+        ];
+
+        const scaleContainer = document.getElementById('scaleContainer');
+        const scaleDetailBox = document.getElementById('scaleDetailBox');
+
+        fMajorScale.forEach((item, index) => {
+            const block = document.createElement('div');
+            block.className = 'music-note-block font-bold text-xl text-slate-700';
+            block.innerHTML = `<span>${item.note}</span><span class="text-xs text-slate-400 mt-1 font-normal">${item.degree}</span>`;
+            
+            block.addEventListener('mouseenter', () => updateDetailBox(item));
+            block.addEventListener('focus', () => updateDetailBox(item));
+            
+            scaleContainer.appendChild(block);
+        });
+
+        function updateDetailBox(item) {
+            scaleDetailBox.innerHTML = `
+                <div class="animate-pulse duration-75">
+                    <h3 class="text-2xl font-bold text-emerald-600 mb-1">Bậc ${item.degree}: Nốt ${item.note}</h3>
+                    <p class="text-lg font-semibold text-slate-700 mb-2">Chức năng: ${item.func}</p>
+                    <p class="text-slate-600">${item.desc}</p>
+                    <div class="mt-3 inline-block bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-sm font-mono border border-slate-200">
+                        Khoảng cách từ nốt trước: ${item.step}
+                    </div>
+                </div>
+            `;
+            
+            document.querySelectorAll('.music-note-block').forEach(b => b.classList.remove('active'));
+            event.target.closest('.music-note-block').classList.add('active');
+        }
+
+        const timelineData = [
+            { id: 1, time: "5 Phút", title: "Khởi động", gv: "Đàn một đoạn nhạc ngắn giọng F dur (VD: Trích đoạn Lullaby). Đặt câu hỏi khơi gợi về màu sắc âm thanh.", sv: "Nghe tích cực, nhận diện cảm giác 'trưởng' (vui tươi, sáng sủa, bình yên).", detail: "Mục đích: Thiết lập bầu không khí âm nhạc và đánh thức thính giác." },
+            { id: 2, time: "10 Phút", title: "Hoạt động 1: Nhận diện giọng F dur", gv: "Thuyết giảng về dấu hóa Bb, cấu trúc Gam, âm chủ F. Minh họa trên khuông nhạc. Hướng dẫn mẹo nhớ vị trí Bb. So sánh với C dur.", sv: "Ghi chép lý thuyết, phân tích cấu trúc cung/nửa cung trên sơ đồ khuông nhạc.", detail: "Mục đích: Hiểu nền tảng lý thuyết cốt lõi." },
+            { id: 3, time: "10 Phút", title: "Hoạt động 2: Luyện gam & Quãng", gv: "Đàn mẫu gam F dur (Ascending/Descending), giữ nhịp ổn định. Sử dụng ký hiệu bàn tay Kodály hướng dẫn.", sv: "Xướng âm theo đàn; thực hiện Hand signs đồng thời để ghi nhớ không gian cao độ.", detail: "Mục đích: Hình thành cảm giác điệu tính rõ ràng." },
+            { id: 4, time: "10 Phút", title: "Hoạt động 3: Luyện Pattern", gv: "Đưa ra các thẻ mẫu tiết tấu và cao độ (Stepwise & Skip). Tổ chức luyện tập lặp lại, đặc biệt chú ý quãng 4 (F-Bb).", sv: "Đọc mẫu theo phương pháp bắt chước (Imitation). Kết hợp gõ phách cơ bản.", detail: "Mục đích: Phản xạ nhanh với các âm hình quen thuộc." },
+            { id: 5, time: "10 Phút", title: "Hoạt động 4: Áp dụng TST", gv: "Thực hiện mô hình Teacher-Student-Teacher. Đọc mẫu -> Lắng nghe sinh viên -> Sửa lỗi và củng cố ngay lập tức.", sv: "Thực hiện đọc lại độc lập hơn. Tự nhận xét lỗi sai của bản thân và của bạn học.", detail: "Mục đích: Rèn luyện kỹ năng cá nhân, đảm bảo tính chính xác tuyệt đối." },
+            { id: 6, time: "5 Phút", title: "Hoạt động 5: Thực hành Nhóm", gv: "Chia lớp thành 2 nhóm đọc đối đáp hoặc hát canon đơn giản bài xướng âm (2-4 câu). Quan sát và bắt nhịp.", sv: "Hợp tác nhóm, nỗ lực giữ vững cao độ và nhịp điệu khi có bè khác vang lên.", detail: "Mục đích: Ứng dụng tập thể, rèn luyện sự tập trung thính giác." }
+        ];
+
+        const timelineButtonsContainer = document.getElementById('timelineButtons');
+        const timelineContent = document.getElementById('timelineContent');
+
+        function renderTimelineContent(stepId) {
+            const step = timelineData.find(s => s.id === stepId);
+            
+            document.querySelectorAll('.timeline-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-step-${stepId}`).classList.add('active');
+
+            timelineContent.style.opacity = '0';
+            
+            setTimeout(() => {
+                timelineContent.innerHTML = `
+                    <div class="flex items-center gap-3 mb-6">
+                        <span class="bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full text-sm">${step.time}</span>
+                        <h3 class="text-2xl font-bold text-slate-800">${step.title}</h3>
+                    </div>
+                    <p class="text-slate-500 italic mb-6 pb-4 border-b border-slate-100">${step.detail}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                            <h4 class="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                                <span class="bg-blue-200 text-blue-800 w-6 h-6 rounded-full flex items-center justify-center text-xs">GV</span> Hoạt động Giảng viên
+                            </h4>
+                            <p class="text-slate-700 leading-relaxed">${step.gv}</p>
+                        </div>
+                        <div class="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
+                            <h4 class="font-bold text-emerald-800 mb-3 flex items-center gap-2">
+                                <span class="bg-emerald-200 text-emerald-800 w-6 h-6 rounded-full flex items-center justify-center text-xs">SV</span> Hoạt động Sinh viên
+                            </h4>
+                            <p class="text-slate-700 leading-relaxed">${step.sv}</p>
+                        </div>
+                    </div>
+                `;
+                timelineContent.style.opacity = '1';
+            }, 150);
+        }
+
+        timelineData.forEach(step => {
+            const btn = document.createElement('button');
+            btn.id = `btn-step-${step.id}`;
+            btn.className = 'timeline-btn text-left px-5 py-4 rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-emerald-500 hover:text-emerald-700 transition-all font-medium focus:outline-none';
+            btn.innerHTML = `<span class="block text-xs font-bold text-slate-400 mb-1">Bước ${step.id} &bull; ${step.time}</span>${step.title}`;
+            btn.onclick = () => renderTimelineContent(step.id);
+            timelineButtonsContainer.appendChild(btn);
+        });
+
+        renderTimelineContent(1);
+
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                
+                tabBtns.forEach(b => {
+                    b.classList.remove('active');
+                    b.classList.replace('text-b45309', 'text-slate-500');
+                    b.classList.add('text-slate-500');
+                });
+                
+                btn.classList.add('active');
+                btn.classList.remove('text-slate-500');
+                
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                    content.classList.remove('block');
+                });
+                
+                document.getElementById(targetId).classList.remove('hidden');
+                document.getElementById(targetId).classList.add('block');
+            });
+        });
+    </script>
+</body>
+</html>
